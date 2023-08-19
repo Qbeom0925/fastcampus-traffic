@@ -21,22 +21,31 @@ public class MemberRepository {
     private final NamedParameterJdbcTemplate namedParameterJdbcTemplate;
     static private final String TABLE = "Member";
 
+    RowMapper<Member> rowMapper = (ResultSet resultSet, int rowNum) -> Member.builder()
+        .id(resultSet.getLong("id"))
+        .nickname(resultSet.getString("nickname"))
+        .email(resultSet.getString("email"))
+        .birthday(resultSet.getTimestamp("birthday").toLocalDateTime())
+        .createdAt(resultSet.getTimestamp("createdAt").toLocalDateTime())
+        .build();
+
     public Optional<Member> findById(Long id){
         val sql = String.format("SELECT * FROM %s WHERE id = :id", TABLE);
         var param = new MapSqlParameterSource()
             .addValue("id", id);
 
-        RowMapper<Member> rowMapper = (ResultSet resultSet, int rowNum) -> Member.builder()
-            .id(resultSet.getLong("id"))
-            .nickname(resultSet.getString("nickname"))
-            .email(resultSet.getString("email"))
-            .birthday(resultSet.getTimestamp("birthday").toLocalDateTime())
-            .createdAt(resultSet.getTimestamp("createdAt").toLocalDateTime())
-            .build();
         var member = namedParameterJdbcTemplate.queryForObject(sql, param, rowMapper);
         return Optional.ofNullable(member);
     }
 
+    public List<Member> findAllByIdIn(List<Long> ids){
+        if (ids.isEmpty())
+            return List.of();
+        var sql = String.format("SELECT * FROM %s WHERE id IN (:ids)", TABLE);
+        var params = new MapSqlParameterSource()
+            .addValue("ids", ids);
+        return namedParameterJdbcTemplate.query(sql, params, rowMapper);
+    }
 
     public Member save(Member member){
         if (member.getId() == null){
@@ -61,6 +70,10 @@ public class MemberRepository {
     }
 
     private Member update(Member member){
+        var sql = String.format("UPDATE Member SET nickname = :nickname, email = :email, birthday = :birthday WHERE id = :id", TABLE);
+        BeanPropertySqlParameterSource params = new BeanPropertySqlParameterSource(
+            member);
+        namedParameterJdbcTemplate.update(sql, params);
         return member;
     }
 }
